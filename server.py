@@ -7,8 +7,9 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
-BUILD = 3
-VERSION = "1.0.1"
+# --- VERSION ---
+BUILD = 4
+VERSION = "1.1"
 
 
 # Environment
