@@ -88,7 +88,11 @@ def verify_token(token: str, expected_token: str) -> bool:
     return token == expected_token
 
 def throw_if_token_bad(token, expected):
-    if not verify_token(token.credentials, expected):
+    """Throw if verify_token is False"""
+    try:
+        if not verify_token(token.credentials, expected):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+    except:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 # Endpoints
