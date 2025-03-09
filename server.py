@@ -38,7 +38,7 @@ BF_DATA_VERSION_FILE = f"{BF_DATA_DIR_PATH}/version.txt"
 
 def set_ver():
     with open(BF_DATA_VERSION_FILE, 'w') as f:
-        f.write("tallybox:{BUILD}")
+        f.write(f"tallybox:{BUILD}")
 
 set_ver()
 
