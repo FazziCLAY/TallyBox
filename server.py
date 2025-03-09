@@ -7,15 +7,30 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
+BUILD = 2
+VERSION = "1.0"
+
 # env
 load_dotenv()
-VALID_API_GET_TOTAL_TOKEN = os.getenv("VALID_API_GET_TOTAL_TOKEN")
-VALID_API_GET_HISTORY_TOKEN = os.getenv("VALID_API_GET_HISTORY_TOKEN")
-VALID_API_SET_TOKEN = os.getenv("VALID_API_SET_TOKEN")
-BF_DATA_DIR_PATH = os.getenv("BF_DATA_DIR_PATH")
+TOKEN = os.getenv("TALLYBOX_API_TOKEN", None)
+VALID_API_GET_TOTAL_TOKEN = os.getenv("TALLYBOX_API_GET_TOTAL_TOKEN", default=TOKEN)
+VALID_API_GET_HISTORY_TOKEN = os.getenv("TALLYBOX_API_GET_HISTORY_TOKEN", default=TOKEN)
+VALID_API_SET_TOKEN = os.getenv("TALLYBOX_API_SET_TOKEN", default=TOKEN)
+BF_DATA_DIR_PATH = os.getenv("TALLYBOX_DATA_DIR_PATH")
 
-if VALID_API_GET_TOTAL_TOKEN is None or VALID_API_GET_HISTORY_TOKEN is None or VALID_API_SET_TOKEN is None or BF_DATA_DIR_PATH is None:
-    raise ValueError("environment variables not set!")
+missing_vars = []
+if BF_DATA_DIR_PATH is None:
+    missing_vars.append("[TALLYBOX_DATA_DIR_PATH]")
+if VALID_API_GET_TOTAL_TOKEN is None:
+    missing_vars.append("[TALLYBOX_API_GET_TOTAL_TOKEN or TALLYBOX_API_TOKEN]")
+if VALID_API_GET_HISTORY_TOKEN is None:
+    missing_vars.append("[TALLYBOX_API_GET_HISTORY_TOKEN or TALLYBOX_API_TOKEN]")
+if VALID_API_SET_TOKEN is None:
+    missing_vars.append("[TALLYBOX_API_SET_TOKEN or TALLYBOX_API_TOKEN]")
+
+
+if missing_vars:
+    raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
 
 BF_DATA_TOTAL_FILE = f"{BF_DATA_DIR_PATH}/total.txt"
 BF_DATA_HISTORY_FILE = f"{BF_DATA_DIR_PATH}/history.json"
@@ -23,7 +38,7 @@ BF_DATA_VERSION_FILE = f"{BF_DATA_DIR_PATH}/version.txt"
 
 def set_ver():
     with open(BF_DATA_VERSION_FILE, 'w') as f:
-        f.write("buckwheatf:1")
+        f.write("tallybox:{BUILD}")
 
 set_ver()
 
@@ -69,7 +84,7 @@ def verify_token(token: str, expected_token: str) -> bool:
 
 def throw_if_token_bad(token, expected):
     if not verify_token(token.credentials, expected):
-        raise HTTPException(status_code=403, detail="Invalid API token")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 @app.get("/total")
 async def get_total(token = Depends(security)):
@@ -95,10 +110,10 @@ class ChangeRequest(BaseModel):
 async def post_change(request: ChangeRequest, token = Depends(security)):
     throw_if_token_bad(token, VALID_API_SET_TOKEN)
     if request.comment is None:
-        raise HTTPException(status_code=500, detail="comment is required")
+        raise HTTPException(status_code=500, detail="Comment is required")
 
-    if len(request.comment) > 1024:
-        raise HTTPException(status_code=500, detail="comment too big")
+    if len(request.comment) > 1024*8:
+        raise HTTPException(status_code=500, detail="Comment too big")
 
     data.total = data.total + int(request.amount)
     history_record = {
@@ -113,4 +128,5 @@ async def post_change(request: ChangeRequest, token = Depends(security)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print(f"Starting TallyBox v{VERSION} ({BUILD})")
+    uvicorn.run(app, host="0.0.0.0", port=8080)
