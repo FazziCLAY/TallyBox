@@ -7,99 +7,108 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
-BUILD = 3
-VERSION = "1.0.1"
+# --- VERSION ---
+BUILD = 4
+VERSION = "1.1"
 
-# env
+
+# Environment
 load_dotenv()
-TOKEN = os.getenv("TALLYBOX_API_TOKEN", None)
-VALID_API_GET_TOTAL_TOKEN = os.getenv("TALLYBOX_API_GET_TOTAL_TOKEN", default=TOKEN)
-VALID_API_GET_HISTORY_TOKEN = os.getenv("TALLYBOX_API_GET_HISTORY_TOKEN", default=TOKEN)
-VALID_API_SET_TOKEN = os.getenv("TALLYBOX_API_SET_TOKEN", default=TOKEN)
-BF_DATA_DIR_PATH = os.getenv("TALLYBOX_DATA_DIR_PATH")
+API_TOKEN = os.getenv("TALLYBOX_API_TOKEN", default=None) # def for tokens below if they not present
+API_GET_TOTAL_TOKEN = os.getenv("TALLYBOX_API_GET_TOTAL_TOKEN", default=API_TOKEN) # for /total
+API_GET_HISTORY_TOKEN = os.getenv("TALLYBOX_API_GET_HISTORY_TOKEN", default=API_TOKEN) # for /history
+API_SET_TOKEN = os.getenv("TALLYBOX_API_SET_TOKEN", default=API_TOKEN) # token for /change and /data
+DATA_DIR_PATH = os.getenv("TALLYBOX_DATA_DIR_PATH") # required, data dir
 
 missing_vars = []
-if BF_DATA_DIR_PATH is None:
+if DATA_DIR_PATH is None:
     missing_vars.append("[TALLYBOX_DATA_DIR_PATH]")
-if VALID_API_GET_TOTAL_TOKEN is None:
+if API_GET_TOTAL_TOKEN is None:
     missing_vars.append("[TALLYBOX_API_GET_TOTAL_TOKEN or TALLYBOX_API_TOKEN]")
-if VALID_API_GET_HISTORY_TOKEN is None:
+if API_GET_HISTORY_TOKEN is None:
     missing_vars.append("[TALLYBOX_API_GET_HISTORY_TOKEN or TALLYBOX_API_TOKEN]")
-if VALID_API_SET_TOKEN is None:
+if API_SET_TOKEN is None:
     missing_vars.append("[TALLYBOX_API_SET_TOKEN or TALLYBOX_API_TOKEN]")
-
 
 if missing_vars:
     raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
 
-BF_DATA_TOTAL_FILE = f"{BF_DATA_DIR_PATH}/total.txt"
-BF_DATA_HISTORY_FILE = f"{BF_DATA_DIR_PATH}/history.json"
-BF_DATA_VERSION_FILE = f"{BF_DATA_DIR_PATH}/version.txt"
+DATA_TOTAL_FILE = f"{DATA_DIR_PATH}/total.txt"
+DATA_HISTORY_FILE = f"{DATA_DIR_PATH}/history.json"
+DATA_VERSION_FILE = f"{DATA_DIR_PATH}/version.txt"
 
+# set version.txt file for feature...
 def set_ver():
-    with open(BF_DATA_VERSION_FILE, 'w') as f:
-        f.write("tallybox:{BUILD}")
+    with open(DATA_VERSION_FILE, 'w') as f:
+        f.write(f"tallybox:{BUILD}")
 
 set_ver()
 
-class BuckwheatData:
+# Data handler for 'data' variable
+class TallyBoxData:
     def __init__(self, total, history):
         self.total = total
         self.history = history
 
     def save(self):
-        with open(BF_DATA_TOTAL_FILE, 'w') as f:
+        """Save object to DATA_DIR_PATH"""
+        with open(DATA_TOTAL_FILE, 'w') as f:
             f.write(str(self.total))
 
-        with open(BF_DATA_HISTORY_FILE, 'w') as f:
+        with open(DATA_HISTORY_FILE, 'w') as f:
             f.write(json.dumps(self.history))
 
-def load() -> BuckwheatData:
+def load() -> TallyBoxData:
+    """Load a TallyBoxData object from DATA_DIR_PATH (if exists, otherwise create default)"""
     _total = 0
     _history = []
     c = 2
-    if os.path.exists(BF_DATA_TOTAL_FILE):
-        with open(BF_DATA_TOTAL_FILE, 'r') as f:
+    if os.path.exists(DATA_TOTAL_FILE):
+        with open(DATA_TOTAL_FILE, 'r') as f:
             _total = int(str(f.read()))
         c -= 1
 
-    if os.path.exists(BF_DATA_HISTORY_FILE):
-        with open(BF_DATA_HISTORY_FILE, 'r') as f:
+    if os.path.exists(DATA_HISTORY_FILE):
+        with open(DATA_HISTORY_FILE, 'r') as f:
             _history = json.loads(str(f.read()))
         c -= 1
 
-    obj = BuckwheatData(_total, _history)
+    obj = TallyBoxData(_total, _history)
     if c > 0:
         obj.save()
     return obj
 
-# api
+
+### Application
 app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
 security = HTTPBearer()
-data = load()
-
+data = load() # Restore a TallyBoxData from files
 
 def verify_token(token: str, expected_token: str) -> bool:
     return token == expected_token
 
 def throw_if_token_bad(token, expected):
-    if not verify_token(token.credentials, expected):
+    """Throw if verify_token is False"""
+    try:
+        if not verify_token(token.credentials, expected):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+    except:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+# Endpoints
 @app.get("/total")
 async def get_total(token = Depends(security)):
-    throw_if_token_bad(token, VALID_API_GET_TOTAL_TOKEN)
+    throw_if_token_bad(token, API_GET_TOTAL_TOKEN)
     return {"total": data.total}
 
 @app.get("/history")
 async def get_history(token = Depends(security)):
-    """Get total amount of money"""
-    throw_if_token_bad(token, VALID_API_GET_HISTORY_TOKEN)
+    throw_if_token_bad(token, API_GET_HISTORY_TOKEN)
     return {"history": data.history}
 
 @app.get("/data")
 async def get_data(token = Depends(security)):
-    throw_if_token_bad(token, VALID_API_SET_TOKEN)
+    throw_if_token_bad(token, API_SET_TOKEN)
     return {"history": data.history, "total": data.total}
 
 class ChangeRequest(BaseModel):
@@ -108,7 +117,7 @@ class ChangeRequest(BaseModel):
 
 @app.post("/change")
 async def post_change(request: ChangeRequest, token = Depends(security)):
-    throw_if_token_bad(token, VALID_API_SET_TOKEN)
+    throw_if_token_bad(token, API_SET_TOKEN)
     if request.comment is None:
         raise HTTPException(status_code=500, detail="Comment is required")
 
