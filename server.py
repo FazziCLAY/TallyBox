@@ -7,8 +7,8 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 
-BUILD = 2
-VERSION = "1.0"
+BUILD = 3
+VERSION = "1.0.1"
 
 # env
 load_dotenv()
@@ -74,7 +74,7 @@ def load() -> BuckwheatData:
     return obj
 
 # api
-app = FastAPI()
+app = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
 security = HTTPBearer()
 data = load()
 
