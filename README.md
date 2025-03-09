@@ -8,7 +8,7 @@ Retrieves the current total balance.
 
 **Headers:**  
 ```
-Authorization: *TALLYBOX_API_GET_TOTAL_TOKEN*
+Authorization: Bearer *TALLYBOX_API_GET_TOTAL_TOKEN*
 ```
 
 **Response:**  
@@ -25,7 +25,7 @@ Returns the full transaction history.
 
 **Headers:**  
 ```
-Authorization: *TALLYBOX_API_GET_HISTORY_TOKEN*
+Authorization: Bearer *TALLYBOX_API_GET_HISTORY_TOKEN*
 ```
 
 **Response:**  
@@ -48,7 +48,7 @@ Returns both the current total and transaction history.
 
 **Headers:**  
 ```
-Authorization: *TALLYBOX_API_SET_TOKEN*
+Authorization: Bearer *TALLYBOX_API_SET_TOKEN*
 ```
 
 **Response:**  
@@ -68,7 +68,7 @@ Adds a new transaction (income or expense).
 
 **Headers:**  
 ```
-Authorization: *TALLYBOX_API_SET_TOKEN*
+Authorization: Bearer *TALLYBOX_API_SET_TOKEN*
 ```
 
 **Request Body:**  
@@ -121,6 +121,7 @@ TALLYBOX_API_GET_HISTORY_TOKEN=your_history_token
 TALLYBOX_API_SET_TOKEN=your_set_token
 TALLYBOX_DATA_DIR_PATH=/var/lib/tallybox  # Path to store data inside the container
 ```
+(Remove #comments before save please)
 
 Replace `your_master_token`, `your_total_token`, etc., with actual values. (generate random)
 
